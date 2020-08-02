@@ -27,32 +27,64 @@ public class DataHelper {
         String code;
     }
 
-    public static String getUserIdFor(AuthInfo authInfo) throws SQLException {
-        val userIdSQL = "SELECT id FROM users WHERE login='" + authInfo.getLogin() + "'";
-        val runner = new QueryRunner();
-
-        try (
-                val conn = DriverManager.getConnection(
-                        "jdbc:mysql://192.168.99.100:3306/app", "app", "123"
-                );
-        ) {
-
-            val id = runner.query(conn, userIdSQL, new ScalarHandler<>());
-            return (String) id;
-        }
+    @Value
+    public static class DataBaseConn {
+        String url;
+        String user;
+        String password;
     }
 
-    public static VerificationCode getVerificationCodeFor(AuthInfo authInfo) throws SQLException {
-        val codeSQL = "SELECT code FROM auth_codes WHERE user_id='" + getUserIdFor(authInfo) + "'";
-        val runner = new QueryRunner();
+    public static DataBaseConn getDataBaseConn() {
+        return new DataBaseConn("jdbc:mysql://192.168.99.100:3306/app", "app", "123");
+    }
 
-        try (
-                val conn = DriverManager.getConnection(
-                        "jdbc:mysql://192.168.99.100:3306/app", "app", "123"
-                );
-        ) {
+    public static String getUserIdFor(AuthInfo authInfo) throws SQLException {
+        String id = null;
+        try {
+            val userIdSQL = "SELECT id FROM users WHERE login='" + authInfo.getLogin() + "'";
+            val runner = new QueryRunner();
+            val conn = DriverManager.getConnection(
+                    getDataBaseConn().url, getDataBaseConn().user, getDataBaseConn().password
+            );
+            val userId = runner.query(conn, userIdSQL, new ScalarHandler<>());
+            id = (String) userId;
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return id;
+    }
+
+    public static VerificationCode getVerificationCodeFor(AuthInfo authInfo) {
+        VerificationCode verificationCode = null;
+        try {
+            val codeSQL = "SELECT code FROM auth_codes WHERE user_id='" + getUserIdFor(authInfo) + "'";
+            val runner = new QueryRunner();
+            val conn = DriverManager
+                    .getConnection(getDataBaseConn().url, getDataBaseConn().user, getDataBaseConn().password);
             val code = runner.query(conn, codeSQL, new ScalarHandler<>());
-            return new VerificationCode((String) code);
+            verificationCode = new VerificationCode((String) code);
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return verificationCode;
+    }
+
+    public static void deleteAllDataInTables() {
+        try {
+            val runner = new QueryRunner();
+            val deleteAuthCodes = "DELETE FROM auth_codes";
+            val deleteCardTransactions = "DELETE FROM card_transactions";
+            val deleteCards = "DELETE FROM cards";
+            val deleteUsers = "DELETE FROM users";
+            val conn = DriverManager.getConnection(
+                    DataHelper.getDataBaseConn().getUrl(), DataHelper.getDataBaseConn().getUser(), DataHelper.getDataBaseConn().getPassword()
+            );
+            runner.update(conn, deleteAuthCodes);
+            runner.update(conn, deleteCardTransactions);
+            runner.update(conn, deleteCards);
+            runner.update(conn, deleteUsers);
+        } catch (SQLException e) {
+            e.printStackTrace();
         }
     }
 }
